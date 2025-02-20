@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<meta charset="UTF-8">
+	<title>ドロップウォッチ</title>
+	<style>
+		body {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			font-family: sans-serif;
+			transition: background-color 0.3s ease, color 0.3s ease;
+		}
+		#iframe-list {
+			display: flex;
+			flex-wrap: wrap;
+			justify-content: center;
+		}
+		.iframe-container {
+			display: flex;
+			align-items: center;
+			margin: 10px;
+			border: 1px solid #ccc;
+			padding: 10px;
+			border-radius: 5px;
+		}
+		iframe {
+			width: 320px;
+			height: 240px;
+			margin-right: 10px;
+		}
+		button {
+			padding: 5px 10px;
+			background-color: #f44336;
+			color: white;
+			border: none;
+			border-radius: 4px;
+			cursor: pointer;
+		}
+		button:hover {
+			background-color: #d32f2f;
+		}
+		body.dark-mode {
+			background-color: #181818;
+			color: #e0e0e0;
+		}
+		.dark-mode .iframe-container {
+			border-color: #555;
+		}
+		.dark-mode button {
+			background-color: #b71c1c;
+		}
+		.switch {
+			position: relative;
+			display: inline-block;
+			width: 60px;
+			height: 34px;
+			margin-bottom: 20px;
+		}
+		.switch input { 
+			opacity: 0;
+			width: 0;
+			height: 0;
+		}
+		.slider {
+			position: absolute;
+			cursor: pointer;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background-color: #ccc;
+			-webkit-transition: .4s;
+			transition: .4s;
+			border-radius: 34px;
+		}
+		.slider:before {
+			position: absolute;
+			content: "";
+			height: 26px;
+			width: 26px;
+			left: 4px;
+			bottom: 4px;
+			background-color: white;
+			-webkit-transition: .4s;
+			transition: .4s;
+			border-radius: 50%;
+		}
+		.url-bar-container {
+			width: 80%;
+			background-color: #e0e0e0;
+			border-radius: 4px;
+			overflow: hidden;
+			margin-top: 20px;
+			box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+			margin-bottom: 20px;
+		}
+		.url-bar {
+			height: 20px;
+			background-color: #4caf50;
+			width: 0%;
+			transition: width 0.3s ease-in-out, background-color 0.3s ease;
+		}
+		body.dark-mode .url-bar-container {
+			background-color: #303030;
+		}
+		input:checked + .slider {
+			background-color: #2196F3;
+		}
+		input:focus + .slider {
+			box-shadow: 0 0 1px #2196F3;
+		}
+		input:checked + .slider:before {
+			-webkit-transform: translateX(26px);
+			-ms-transform: translateX(26px);
+			transform: translateX(26px);
+		}
+		#video-count {
+		  font-size: 0.7em;
+		}
+		a {
+			color: #0000EE;
+		}
+		.dark-mode a {
+				color: #8AB4F8;
+			}
+	</style>
+</head>
+<body>
+	<h1 id="pageTitle">ドロップウォッチ
+		<span id="video-count"></span>
+	</h1>
+	<label class="switch">
+		<input type="checkbox" id="darkModeToggle">
+		<span class="slider">
+		</span>
+	</label>
+	<button onclick="toggleInstructions()" style="margin-bottom: 20px;">使い方</button>
+	<div id="text" style="display: none;">
+		<p>ページの空白部分に動画リンクのドロップでiframeを追加します。</p>
+		<p>追加するとurlが更新されブックマークで保存できます。</p>
+		<p>対応サイト</p>
+		<ul>
+			<li><a href="https://www.youtube.com/" target="_blank" onclick="window.open(this.href, '_blank', 'width='+window.outerWidth*0.7+',height='+window.outerHeight+',left='+window.screenX+',menubar=yes,toolbar=yes,location=yes,status=yes,resizable=yes'); return false;">YouTube</a></li>
+			<li><a href="https://www.nicovideo.jp/recommendations?ref=videotop_recommend" target="_blank" onclick="window.open(this.href, '_blank', 'width='+window.outerWidth*0.7+',height='+window.outerHeight+',left='+window.screenX+',menubar=yes,toolbar=yes,location=yes,status=yes,resizable=yes'); return false;">ニコニコ動画</a></li>
+			<li><a href="https://live.fc2.com/" target="_blank" onclick="window.open(this.href, '_blank', 'width='+window.outerWidth*0.7+',height='+window.outerHeight+',left='+window.screenX+',menubar=yes,toolbar=yes,location=yes,status=yes,resizable=yes'); return false;">FC2ライブ</a></li>
+		</ul>
+	</div>
+	<div class="url-bar-container">
+		<div class="url-bar">
+		</div>
+	</div>
+	<div id="iframe-list">
+	</div>
+	<script>
+		const iframeList = document.getElementById("iframe-list");
+		const maxUrlLength = 1800;
+		function getVideoId(url) {
+			let match;
+			//YouTube
+			if (url.includes("youtube.com") || url.includes("youtu.be")) {
+				match = url.match(/(?:v=|youtu\.be\/|shorts\/)([a-zA-Z0-9_-]+)/);
+				if (match) return "yt" + match[1];
+			}
+			//ニコ動
+			if (url.includes("nicovideo.jp/watch/")) {
+				match = url.match(/nicovideo\.jp\/watch\/(sm\d+)/);
+				if (match) return match[1];
+			}
+			//fc2
+			if (url.includes("fc2.com")) {
+				match = url.match(/fc2\.com\/(\d+)\//);
+				if (match) return "f" + match[1];
+			}
+			/*ニコ生
+			if (url.includes("nicovideo.jp/watch/lv")) {
+			match = url.match(/nicovideo\.jp\/watch\/(lv\d+)/);
+			if (match) return match[1];
+			}*/
+			return null;
+		}
+		function createIframe(videoId) {
+			let src;
+			let iframe;
+			if (videoId.startsWith("f")) {
+				src = `https://live.fc2.com/embedPlayer/?id=${videoId.substring(1)}&lang=ja&suggest=1&thumbnail=1&adultaccess=0&afid=${videoId.substring(1)}`;
+				iframe = document.createElement("iframe");
+				iframe.src = src;
+				iframe.frameborder = "0";
+				iframe.scrolling = "no";
+				iframe.allowfullscreen = "1";
+				iframe.dataset.src = src;
+			} else if (videoId.startsWith("yt")) {
+				src = `https://www.youtube.com/embed/${videoId.substring(2)}`;
+				iframe = document.createElement("iframe");
+				iframe.src = src;
+				iframe.title = "YouTube video player";
+				iframe.frameborder = "0";
+				iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+				iframe.allowfullscreen = true;
+			} else if (videoId.startsWith("sm")) {
+				src = `https://embed.nicovideo.jp/watch/${videoId}`;
+				iframe = document.createElement("iframe");
+				iframe.src = src;
+				iframe.frameborder = "0";
+				iframe.allowfullscreen = true;
+			} else if (videoId.startsWith("lv")) {
+				src = `https://live.nicovideo.jp/embed/${videoId}`;
+				iframe = document.createElement("iframe");
+				iframe.src = src;
+				iframe.scrolling = "no";
+				iframe.frameborder = "0";
+				iframe.loading = "lazy";
+				iframe.allowfullscreen = true;
+			}
+			iframe.style.width = "352px";//320
+			iframe.style.height = "246px";//240
+			iframe.style.marginRight = "10px";
+			return iframe;
+		}
+		function addIframe(url) {
+			const videoId = getVideoId(url);
+			if (!videoId) {
+				alert("対応していないURLです。");
+				return;
+			}
+			const urlParams = new URLSearchParams(window.location.search);
+			const currentUrls = urlParams.getAll("v").filter(id => id !== "");
+			if (currentUrls.includes(videoId)) {
+				alert("この動画は既に追加されています。");
+				return;
+			}
+			if (window.location.href.length > maxUrlLength) {
+				alert("動画数の上限になりました。\n追加できません。");
+				return;
+			}
+			currentUrls.push(videoId);
+			urlParams.delete("v");
+			currentUrls.forEach(id => urlParams.append("v", id));
+			let newUrl = window.location.pathname + "?" + urlParams.toString();
+			window.history.replaceState({}, "", newUrl);
+			const iframe = createIframe(videoId);
+			const container = document.createElement("div");
+			container.classList.add("iframe-container");
+			container.appendChild(iframe);
+			const buttonContainer = document.createElement("div");
+			buttonContainer.style.display = "flex";
+			buttonContainer.style.flexDirection = "column";
+			buttonContainer.style.marginTop = "10px";
+			const deleteButton = document.createElement("button");
+			deleteButton.textContent = "削除";
+			deleteButton.style.marginBottom = "10px";
+			deleteButton.addEventListener("click", () => removeIframe(videoId, container));
+			buttonContainer.appendChild(deleteButton);
+			if (videoId.startsWith("f")) {//fc2は停止ボタンがないため再読み込みで止める
+				const stopButton = document.createElement("button");
+				stopButton.textContent = "停止";
+				stopButton.addEventListener("click", () => stopIframe(iframe));
+				buttonContainer.appendChild(stopButton);
+			}
+			container.appendChild(buttonContainer);
+			iframeList.appendChild(container);
+			updateVideoCount();
+			updateUrlBar();
+		}
+		function stopIframe(iframe) {
+			iframe.src = iframe.dataset.src;
+		}
+		function removeIframe(videoId, container) {
+			const urlParams = new URLSearchParams(window.location.search);
+			const currentUrls = urlParams.getAll("v");
+			const newUrls = currentUrls.filter(id => id !== videoId);
+			urlParams.delete("v");
+			newUrls.forEach(id => urlParams.append("v", id));
+			let newUrl = window.location.pathname + "?" + urlParams.toString();
+			window.history.replaceState({}, "", newUrl);
+			iframeList.removeChild(container);
+			updateVideoCount();
+			updateUrlBar();
+		}
+		window.addEventListener("DOMContentLoaded", () => {
+			const urlParams = new URLSearchParams(window.location.search);
+			const videoIds = urlParams.getAll("v");
+			videoIds.forEach(videoId => {
+				if (videoId) {
+					const iframe = createIframe(videoId);
+					if (iframe) {
+						const container = document.createElement("div");
+						container.classList.add("iframe-container");
+						container.appendChild(iframe);
+						const buttonContainer = document.createElement("div");
+						buttonContainer.style.display = "flex";
+						buttonContainer.style.flexDirection = "column";
+						buttonContainer.style.marginTop = "10px";
+						const deleteButton = document.createElement("button");
+						deleteButton.textContent = "削除";
+						deleteButton.style.marginBottom = "10px";
+						deleteButton.addEventListener("click", () => removeIframe(videoId, container));
+						buttonContainer.appendChild(deleteButton);
+						if (videoId.startsWith("f")) {
+							const stopButton = document.createElement("button");
+							stopButton.textContent = "停止";
+							stopButton.addEventListener("click", () => stopIframe(iframe));
+							buttonContainer.appendChild(stopButton);
+						}
+						container.appendChild(buttonContainer);
+						iframeList.appendChild(container);
+					}
+				}
+				updateVideoCount();
+				updateUrlBar();
+				updateTitle();
+			});
+		});
+		window.addEventListener("dragover", (event) => {
+			event.preventDefault();
+		});
+		window.addEventListener("drop", (event) => {
+			event.preventDefault();
+			const url = event.dataTransfer.getData("text/plain");
+			addIframe(url);
+		});
+		const darkModeToggle = document.getElementById("darkModeToggle");
+		let isDarkMode = false;
+		try {
+			isDarkMode = localStorage.getItem("darkMode") === "true";
+		} catch (error) {}
+		darkModeToggle.checked = isDarkMode;
+		document.body.classList.toggle("dark-mode", isDarkMode);
+		darkModeToggle.addEventListener("change", () => {
+			const isDarkMode = darkModeToggle.checked;
+			document.body.classList.toggle("dark-mode", isDarkMode);
+			try {
+				localStorage.setItem("darkMode", isDarkMode);
+			} catch (error) {}
+		});
+		function toggleInstructions() {
+			var instructions = document.getElementById("text");
+			if (instructions.style.display === "none") {
+				instructions.style.display = "block";
+			} else {
+				instructions.style.display = "none";
+			}
+		}
+		function updateVideoCount() {
+			const urlParams = new URLSearchParams(window.location.search);
+			const videoCount = urlParams.getAll("v").length;
+			document.getElementById("video-count").textContent = "　動画数：" + videoCount;
+		}
+		function updateUrlBar() {
+			const urlParams = new URLSearchParams(window.location.search);
+			let newUrl = window.location.pathname + "?" + urlParams.toString();
+			const urlBar = document.querySelector(".url-bar");
+			const urlLength = newUrl.length;
+			const barWidth = Math.min((urlLength / maxUrlLength) * 100, 100);
+			urlBar.style.width = `${barWidth}%`;
+			if (barWidth < 60) {
+				urlBar.style.backgroundColor = "#4caf50";
+			} else if (barWidth < 80) {
+				urlBar.style.backgroundColor = "#ff9800";
+			} else {
+				urlBar.style.backgroundColor = "#f44336";
+			}
+		}
+		function updateTitle() {
+			const urlParams = new URLSearchParams(window.location.search);
+			let title = urlParams.get("t");
+			if (!title) {
+				title = "ドロップウォッチ";
+				urlParams.set("t", title);
+			}
+			const currentParams = new URLSearchParams();
+			currentParams.set("t", urlParams.get("t"));
+			urlParams.delete("t");
+			urlParams.forEach((value, key) => {
+				currentParams.set(key, value);
+			});
+			let newUrl = window.location.pathname + "?" + currentParams.toString();
+			window.history.replaceState({}, "", newUrl);
+			document.title = title;
+			const pageTitleElement = document.getElementById("pageTitle");
+			pageTitleElement.firstChild.nodeValue = `${title} `;
+		}
+	</script>
+</body>
+</html>
