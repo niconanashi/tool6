@@ -307,10 +307,10 @@
 						iframeList.appendChild(container);
 					}
 				}
-				updateVideoCount();
-				updateUrlBar();
-				updateTitle();
 			});
+			updateVideoCount();
+			updateUrlBar();
+			updateTitle();
 		});
 		window.addEventListener("dragover", (event) => {
 			event.preventDefault();
@@ -368,20 +368,20 @@
 			if (!title) {
 				title = "ドロップウォッチ";
 				urlParams.set("t", title);
+				let newUrl = window.location.pathname + "?" + urlParams.toString();
+				window.history.replaceState({}, "", newUrl);
+			} else {
+				const currentParams = new URLSearchParams(window.location.search);
+				currentParams.set("t", title);
+				let finalUrl = window.location.pathname + "?" + currentParams.toString();
+				window.history.replaceState({}, "", finalUrl);
 			}
-			const currentParams = new URLSearchParams();
-			currentParams.set("t", urlParams.get("t"));
-			urlParams.delete("t");
-			urlParams.forEach((value, key) => {
-				currentParams.set(key, value);
-			});
-			let newUrl = window.location.pathname + "?" + currentParams.toString();
-			window.history.replaceState({}, "", newUrl);
 			document.title = title;
 			const pageTitleElement = document.getElementById("pageTitle");
-			pageTitleElement.firstChild.nodeValue = `${title} `;
+			if (pageTitleElement && pageTitleElement.firstChild) {
+				pageTitleElement.firstChild.nodeValue = `${title} `;
+			}
 		}
-		updateTitle();
 	</script>
 </body>
 </html>
